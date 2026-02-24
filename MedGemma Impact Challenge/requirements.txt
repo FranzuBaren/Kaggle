@@ -1,0 +1,32 @@
+# CXR-Sentinel — Pinned Dependencies
+# Tested on Python 3.10 + CUDA 12.1 + T4 GPU
+#
+# Install: pip install -r requirements.txt
+
+# ── Core ML ──
+torch>=2.1.0
+transformers>=4.40.0
+bitsandbytes>=0.43.0
+peft>=0.10.0
+accelerate>=0.30.0
+
+# ── Data & Imaging ──
+Pillow>=10.0.0
+numpy>=1.24.0
+pandas>=2.0.0
+
+# ── Visualization ──
+matplotlib>=3.7.0
+seaborn>=0.13.0
+
+# ── Metrics ──
+scipy>=1.11.0
+rouge-score>=0.1.2
+
+# ── Config & Utils ──
+pyyaml>=6.0
+tqdm>=4.65.0
+
+# ── Optional: Kaggle / HuggingFace ──
+# kagglehub>=0.2.0
+# huggingface-hub>=0.22.0

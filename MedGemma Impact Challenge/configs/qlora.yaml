@@ -1,0 +1,57 @@
+# CXR-Sentinel — QLoRA Fine-Tuning Configuration
+# ================================================
+# Fine-tune MedGemma 1.5 4B on OpenI radiology reports
+# ~15-20 min on T4 GPU · 12 GB VRAM · 1 epoch
+
+# ── LoRA hyperparameters ──
+lora:
+  r: 8                    # LoRA rank
+  alpha: 16               # LoRA alpha (scaling)
+  dropout: 0.05           # LoRA dropout
+  target_modules:
+    - "q_proj"
+    - "v_proj"
+    - "k_proj"
+    - "o_proj"
+  bias: "none"
+  task_type: "CAUSAL_LM"
+
+# ── Quantization ──
+quantization:
+  load_in_4bit: true
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_use_double_quant: true
+
+# ── Training ──
+training:
+  n_train: 60             # Training examples from OpenI
+  n_eval: 10              # Held-out evaluation
+  epochs: 1
+  batch_size: 1
+  gradient_accumulation_steps: 8
+  learning_rate: 2.0e-4
+  weight_decay: 0.01
+  warmup_ratio: 0.03
+  max_seq_length: 256
+  fp16: false
+  bf16: true
+  logging_steps: 10
+  save_strategy: "no"     # Single epoch, no checkpointing
+
+# ── Data format ──
+data:
+  # Training target: structured JSON clinical extraction
+  # Auto-generated from OpenI reports via regex entity extraction
+  format: "instruction"
+  input_template: |
+    Analyze this radiology report and extract clinical findings as JSON.
+    Findings: {findings}
+  output_template: |
+    {{"entities": {entities}, "severity": "{severity}", "impression": "{impression}"}}
+
+# ── Expected results ──
+expected:
+  initial_loss: 2.41
+  final_loss: 2.20
+  training_time_minutes: 15

@@ -1,0 +1,76 @@
+# CXR-Sentinel — Default Pipeline Configuration
+# ================================================
+# Single T4 GPU · 20 cases · ~45 min end-to-end
+
+# ── Model settings ──
+model:
+  medgemma:
+    model_id: "google/medgemma-4b-it"
+    quantize: true
+    quant_type: "nf4"
+    compute_dtype: "bfloat16"
+    double_quant: true
+    max_new_tokens: 512
+    temperature: 0.1
+  txgemma:
+    model_id: "google/txgemma-2b-predict"
+    max_new_tokens: 10
+
+# ── Data settings ──
+data:
+  dataset: "openi"
+  n_per_category: 4
+  categories:
+    - "Normal"
+    - "Cardiomegaly"
+    - "Pneumonia"
+    - "Effusion"
+    - "Mass"
+  image_size: 384  # SigLIP encoder input
+  seed: 42
+
+# ── Agent settings ──
+agents:
+  diagnostician:
+    mode: "multimodal"  # multimodal | text_only | image_only
+    max_new_tokens: 512
+  challenger:
+    perturbation_types:
+      - "entity_removal"
+      - "confounder_injection"
+      - "severity_contradiction"
+    seed: 42
+  factchecker:
+    synonym_vocab_size: 20
+
+# ── HITL Safety Gate thresholds ──
+hitl:
+  hi_threshold: 0.4     # Hallucination Index
+  pss_threshold: 0.5    # Perturbation Stability
+  sce_threshold: 0.5    # Severity Calibration Error
+
+# ── Ablation settings ──
+ablation:
+  enabled: true
+  tracks:
+    - "multimodal"
+    - "image_only"
+    - "text_only"
+
+# ── Pharmacovigilance ──
+pharmacovigilance:
+  enabled: true
+
+# ── Metrics & validation ──
+metrics:
+  bootstrap_resamples: 1000
+  confidence_level: 0.95
+  seed: 42
+
+# ── Output ──
+output:
+  figures: true
+  figure_format: ["png", "pdf"]
+  figure_dpi: 300
+  regulatory_report: true
+  save_dir: "results/"

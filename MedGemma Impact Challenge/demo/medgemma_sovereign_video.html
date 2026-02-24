@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CXR-Sentinel — Competition Video</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#f8f6f2;--bg2:#f2efe9;--surface:#ffffff;--surface2:#f5f3ee;
+  --border:#e0dbd3;--border2:#ccc5ba;
+  --ink:#1c1917;--ink2:#3b3631;--ink3:#6d6560;--ink4:#9b9389;
+  --cardinal:#8b1a1a;--cardinal-l:#a82828;
+  --teal:#0e6e6e;--teal-l:#109090;
+  --gold:#a0700a;--gold-l:#c08a12;
+  --forest:#1a6b3a;--forest-l:#22884a;
+  --red:#b42a2a;
+  --blue:#1a5a8a;
+  --heading:'Newsreader',Georgia,serif;
+  --body:'Manrope',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--body)}
+
+/* ===== SUBTLE TEXTURE ===== */
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.18;
+background-image:radial-gradient(circle at 1px 1px,rgba(0,0,0,.035) 1px,transparent 0);background-size:28px 28px}
+
+/* ===== PERSISTENT HEADER ===== */
+.top-bar{position:fixed;top:0;left:0;right:0;z-index:9999;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;background:rgba(248,246,242,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.top-bar .logo{font:600 12px var(--body);letter-spacing:2px;color:var(--cardinal);text-transform:uppercase}
+.top-bar .timer-display{font:500 13px var(--mono);color:var(--ink3);letter-spacing:1px}
+.top-bar .act-label{font:600 11px var(--body);letter-spacing:3px;text-transform:uppercase;color:var(--ink4);
+  padding:4px 14px;border:1px solid var(--border);border-radius:4px;transition:all .4s}
+.top-bar .act-label.act1{color:var(--cardinal);border-color:var(--cardinal)}
+.top-bar .act-label.act2{color:var(--teal);border-color:var(--teal)}
+.top-bar .act-label.act3{color:var(--forest);border-color:var(--forest)}
+
+/* ===== BOTTOM CONTROLS ===== */
+.bottom-bar{position:fixed;bottom:0;left:0;right:0;z-index:9999;display:flex;align-items:center;gap:12px;padding:10px 28px;background:rgba(248,246,242,.92);backdrop-filter:blur(8px);border-top:1px solid var(--border)}
+.progress-track{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;position:relative}
+.progress-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--cardinal),var(--teal),var(--forest));transition:width .4s;width:0}
+.scene-markers{position:absolute;inset:0;display:flex;pointer-events:none}
+.scene-marker{height:100%;border-right:2px solid rgba(255,255,255,.7)}
+.ctrl-btn{background:var(--surface);border:1px solid var(--border);color:var(--ink3);padding:4px 12px;
+  border-radius:4px;font:500 11px var(--body);cursor:pointer;transition:.2s;white-space:nowrap}
+.ctrl-btn:hover{border-color:var(--cardinal);color:var(--cardinal)}
+.scene-num{font:400 11px var(--mono);color:var(--ink4);min-width:70px;text-align:right}
+
+/* ===== SCENE ===== */
+.scene{position:fixed;top:44px;left:0;right:0;bottom:36px;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;z-index:1;opacity:0;pointer-events:none;padding:30px 50px;overflow:hidden}
+.scene.on{opacity:1;pointer-events:auto}
+.scene.fi{animation:fi .8s cubic-bezier(.22,1,.36,1) forwards}
+.scene.fo{animation:fo .45s ease forwards}
+.scene.si{animation:si .65s cubic-bezier(.22,1,.36,1) forwards}
+.scene.so{animation:so .35s ease forwards}
+.scene.zi{animation:zi .65s cubic-bezier(.22,1,.36,1) forwards}
+.scene.zo{animation:zo .35s ease forwards}
+@keyframes fi{from{opacity:0}to{opacity:1}}
+@keyframes fo{from{opacity:1}to{opacity:0}}
+@keyframes si{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
+@keyframes so{from{opacity:1;transform:none}to{opacity:0;transform:translateX(-40px)}}
+@keyframes zi{from{opacity:0;transform:scale(.93)}to{opacity:1;transform:none}}
+@keyframes zo{from{opacity:1;transform:none}to{opacity:0;transform:scale(1.04)}}
+
+/* ===== ATOMS ===== */
+.tag{font:600 10px var(--body);letter-spacing:3.5px;text-transform:uppercase;margin-bottom:6px}
+.heading{font:600 clamp(1.4rem,2.8vw,2rem)/1.25 var(--heading);color:var(--ink)}
+.subtext{font:400 clamp(.8rem,1.2vw,.92rem)/1.6 var(--body);color:var(--ink3);max-width:580px}
+.rule{width:50px;height:2px;border-radius:1px;margin:12px 0;opacity:0;transition:opacity .5s,width .6s}
+.caption{font:400 11px var(--body);color:var(--ink4);letter-spacing:.3px}
+
+/* TERM */
+.term{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;box-shadow:0 1px 10px rgba(0,0,0,.04)}
+.term-h{background:var(--surface2);padding:7px 14px;display:flex;align-items:center;gap:7px;border-bottom:1px solid var(--border)}
+.term-h .d{width:7px;height:7px;border-radius:50%}
+.term-h span{font:500 10.5px var(--mono);color:var(--ink4);letter-spacing:.3px;margin-left:4px}
+.term-b{padding:12px 14px;font:400 11.5px/1.85 var(--mono);color:var(--ink2);min-height:60px;max-height:220px;overflow-y:auto;background:#fdfcfa}
+.term-b::-webkit-scrollbar{width:3px}
+.term-b::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.tc{color:var(--teal)}.tg{color:var(--forest)}.tr{color:var(--red)}.ta{color:var(--gold)}.tm{color:var(--cardinal)}.td{color:var(--ink4)}.tb{color:var(--blue)}
+.blink{display:inline-block;width:5px;height:12px;background:var(--cardinal);animation:bl 1s step-end infinite;vertical-align:middle;margin-left:1px}
+@keyframes bl{50%{opacity:0}}
+
+/* ========== S0: HOOK — CLINICAL REALITY ========== */
+.s0{text-align:left;flex-direction:row;gap:50px;padding:30px 60px;background:linear-gradient(135deg,var(--bg) 60%,#f0ece4 100%)}
+.s0 .narrative-col{flex:1;max-width:500px;display:flex;flex-direction:column;gap:0}
+.s0 .visual-col{width:380px;display:flex;flex-direction:column;gap:14px;opacity:0}
+.s0 .hook-quote{font:500 clamp(1.3rem,2.5vw,1.8rem)/1.35 var(--heading);font-style:italic;color:var(--ink2);
+  border-left:3px solid var(--cardinal);padding-left:20px;margin:12px 0;opacity:0}
+.s0 .hook-speaker{font:400 12px var(--body);color:var(--ink4);padding-left:23px;opacity:0}
+.s0 .hook-problem{font:400 13px/1.7 var(--body);color:var(--ink3);margin-top:16px;opacity:0}
+.s0 .hook-problem strong{color:var(--red);font-weight:600}
+
+/* Queue mockup */
+.queue-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;
+  display:flex;align-items:center;gap:12px;box-shadow:0 1px 6px rgba(0,0,0,.03)}
+.queue-card .q-status{width:8px;height:8px;border-radius:50%}
+.queue-card .q-info{flex:1}
+.queue-card .q-info .q-id{font:600 12px var(--body);color:var(--ink2)}
+.queue-card .q-info .q-det{font:400 10.5px var(--body);color:var(--ink4)}
+.queue-card .q-time{font:500 11px var(--mono);color:var(--red);white-space:nowrap}
+.queue-label{font:600 10px var(--body);letter-spacing:2px;text-transform:uppercase;color:var(--ink4);margin-bottom:8px}
+.queue-warn{background:rgba(180,42,42,.05);border:1px solid rgba(180,42,42,.15);border-radius:6px;padding:10px 14px;
+  font:500 11.5px/1.5 var(--body);color:var(--red);margin-top:12px;opacity:0}
+
+/* ========== S1: WHY MEDGEMMA ========== */
+.s1{text-align:center}
+.s1 .why-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;max-width:800px;width:100%;margin-top:20px}
+.why-cell{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px 14px;
+  text-align:center;opacity:0;transform:translateY(14px);box-shadow:0 1px 6px rgba(0,0,0,.03)}
+.why-cell .wc-icon{font-size:22px;margin-bottom:6px}
+.why-cell .wc-req{font:700 11px var(--body);color:var(--ink2);letter-spacing:.5px;margin-bottom:4px}
+.why-cell .wc-val{font:400 10.5px/1.4 var(--body);color:var(--ink4)}
+.why-cell .wc-check{color:var(--forest);font-weight:700;margin-top:6px;font-size:12px}
+.s1 .alt-fail{font:400 12px var(--body);color:var(--ink4);margin-top:16px;opacity:0}
+.s1 .alt-fail strong{color:var(--red)}
+
+/* ========== S2: SYSTEM OVERLAY ========== */
+.s2{flex-direction:column;gap:16px}
+.arch-diagram{display:flex;align-items:center;gap:20px;max-width:860px;width:100%;position:relative}
+.arch-node{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:16px 18px;
+  text-align:center;flex:1;opacity:0;transform:translateY(14px);box-shadow:0 2px 10px rgba(0,0,0,.04);position:relative;z-index:2}
+.arch-node h4{font:700 11px var(--body);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px}
+.arch-node p{font:400 10px var(--body);color:var(--ink4);line-height:1.4}
+.arch-arrow{font:400 20px var(--body);color:var(--border2);opacity:0;flex-shrink:0}
+.arch-stack{font:400 10px var(--mono);color:var(--ink4);letter-spacing:.5px;text-align:center;opacity:0;
+  background:var(--surface2);border:1px dashed var(--border);border-radius:6px;padding:10px 18px;margin-top:12px;max-width:860px}
+
+/* ========== S3: CXR CASE — LIVE DEMO ========== */
+.s3{flex-direction:row;gap:36px;padding:30px 50px}
+.s3 .cxr-col{width:300px;display:flex;flex-direction:column;gap:10px;opacity:0}
+.cxr-box{width:100%;aspect-ratio:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  position:relative;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.04)}
+.cxr-box svg{width:100%;height:100%}
+.cx-body{fill:none;stroke:var(--border2);stroke-width:1.2}
+.cx-rib{fill:none;stroke:var(--border);stroke-width:.7}
+.cx-heart{fill:rgba(139,26,26,.03);stroke:var(--cardinal);stroke-width:.8;opacity:.4}
+.cx-mass{fill:rgba(180,42,42,.06);stroke:var(--red);stroke-width:1.5;stroke-dasharray:4 3;opacity:0;transition:opacity 1s}
+/* CXR annotation overlays */
+.cxr-annot{position:absolute;opacity:0;transform:scale(.85);transition:opacity .8s ease,transform .6s ease;pointer-events:none}
+.cxr-annot.show{opacity:1;transform:scale(1)}
+.annot-ring{width:100%;height:100%;border:2px dashed var(--red);border-radius:50%;
+  animation:annot-pulse 2.5s ease-in-out infinite;box-shadow:0 0 12px rgba(180,42,42,.15)}
+@keyframes annot-pulse{0%,100%{box-shadow:0 0 8px rgba(180,42,42,.1)}50%{box-shadow:0 0 18px rgba(180,42,42,.25)}}
+.annot-label{position:absolute;font:600 8px var(--mono);color:var(--red);white-space:nowrap;
+  background:rgba(248,246,242,.88);padding:2px 5px;border-radius:3px;line-height:1.3;
+  box-shadow:0 1px 4px rgba(0,0,0,.12);letter-spacing:.3px}
+.annot-label small{font-weight:400;opacity:.7;font-size:7px}
+
+/* VRAM MONITOR — edge AI proof overlay */
+.vram-mon{position:absolute;top:12px;right:14px;z-index:60;background:rgba(10,10,14,.88);
+  border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:8px 12px;
+  font:500 10px var(--mono);color:#8f8;line-height:1.5;opacity:0;transition:opacity .6s;
+  backdrop-filter:blur(4px);box-shadow:0 2px 10px rgba(0,0,0,.3)}
+.vram-mon.show{opacity:1}
+.vram-bar{width:100px;height:5px;background:rgba(255,255,255,.1);border-radius:3px;margin-top:4px;overflow:hidden}
+.vram-fill{height:100%;background:linear-gradient(90deg,#4c4,#8f8);border-radius:3px;transition:width 1s ease}
+.vram-mon .vram-title{font:600 8px var(--mono);letter-spacing:1.5px;color:rgba(255,255,255,.5);text-transform:uppercase;margin-bottom:3px}
+/* NARRATOR TEXT — silent video guide */
+.narrator{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);
+  max-width:800px;width:90%;text-align:center;z-index:50;pointer-events:none}
+.nar-line{font:500 13px var(--body);color:var(--ink2);line-height:1.6;
+  background:rgba(248,246,242,.92);backdrop-filter:blur(6px);
+  padding:8px 20px;border-radius:6px;border:1px solid var(--border);
+  box-shadow:0 2px 12px rgba(0,0,0,.04);
+  opacity:0;transform:translateY(8px);transition:opacity .6s,transform .5s cubic-bezier(.22,1,.36,1);
+  display:inline-block;margin:0 auto}
+.nar-line.show{opacity:1;transform:none}
+.nar-line strong{color:var(--cardinal);font-weight:700}
+.nar-line em{color:var(--teal);font-style:normal;font-weight:600}
+
+.cx-hotspot{position:absolute;width:38px;height:38px;border:2px solid var(--red);border-radius:50%;
+  right:24%;top:40%;opacity:0;pointer-events:none}
+.cx-hotspot.show{opacity:1;animation:hp 2.5s ease-in-out infinite}
+@keyframes hp{0%,100%{box-shadow:0 0 0 0 rgba(180,42,42,.2)}50%{box-shadow:0 0 0 12px rgba(180,42,42,0)}}
+.case-meta{font:500 11px var(--body);color:var(--ink4)}
+.case-meta span{color:var(--cardinal);font-weight:600}
+.conf-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:4px;
+  font:600 10px var(--body);letter-spacing:1px;text-transform:uppercase}
+.conf-badge.low{background:rgba(180,42,42,.06);color:var(--red);border:1px solid rgba(180,42,42,.15)}
+.conf-badge.high{background:rgba(34,136,74,.06);color:var(--forest);border:1px solid rgba(34,136,74,.15)}
+
+.s3 .demo-col{flex:1;display:flex;flex-direction:column;gap:10px;max-width:520px;opacity:0}
+.pacs-bar{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;
+  display:flex;align-items:center;gap:10px;box-shadow:0 1px 6px rgba(0,0,0,.03)}
+.pacs-bar .pacs-icon{font-size:16px}
+.pacs-bar .pacs-text{font:600 11px var(--body);color:var(--ink2);letter-spacing:.5px}
+.pacs-bar .pacs-status{margin-left:auto;font:500 10px var(--body);color:var(--forest)}
+
+/* ========== S4: DIAGNOSTICIAN + COMPARISON ========== */
+.s4{flex-direction:row;gap:30px;padding:30px 50px}
+.s4 .col{flex:1;display:flex;flex-direction:column;gap:10px;max-width:440px}
+.comparison-header{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.comparison-header .ch-dot{width:10px;height:10px;border-radius:50%}
+.comparison-header h4{font:700 12px var(--body);letter-spacing:1px}
+.diff-highlight{background:rgba(180,42,42,.05);border-left:3px solid var(--red);padding:8px 12px;margin-top:6px;
+  border-radius:0 6px 6px 0;font:500 11.5px/1.6 var(--body);color:var(--red);opacity:0}
+
+/* ========== S5: CHALLENGER ========== */
+.s5{flex-direction:column;gap:16px}
+.p-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:800px;width:100%}
+.p-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px;
+  box-shadow:0 1px 6px rgba(0,0,0,.03);opacity:0;transform:translateY(14px)}
+.p-card h4{font:600 12px var(--heading);color:var(--ink)}
+.p-card .pt{font:500 9px var(--body);letter-spacing:2px;color:var(--ink4);text-transform:uppercase;margin:4px 0 10px}
+.p-card .pe{background:var(--surface2);border-radius:5px;padding:8px 10px;font:400 10.5px/1.6 var(--mono);color:var(--ink2)}
+.p-card .pr{margin-top:10px;font:500 11px var(--body);display:flex;align-items:center;gap:5px}
+.pdot{width:6px;height:6px;border-radius:50%;display:inline-block}
+
+/* ========== S6: FACTCHECKER + VERDICT ========== */
+.s6{flex-direction:row;gap:36px;padding:30px 50px}
+.s6 .met-col{flex:1;display:flex;flex-direction:column;gap:8px;max-width:480px}
+.m-row{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);
+  border:1px solid var(--border);border-radius:6px;opacity:0;transform:translateX(-14px);box-shadow:0 1px 4px rgba(0,0,0,.02)}
+.m-row .mn{flex:1;font:500 11.5px var(--body);color:var(--ink2)}
+.m-row .mb{flex:2;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.mf{height:100%;border-radius:3px;width:0;transition:width 1.3s cubic-bezier(.22,1,.36,1)}
+.m-row .mv{font:700 12px var(--heading);min-width:50px;text-align:right}
+
+.s6 .verd-col{width:280px;display:flex;flex-direction:column;gap:10px;opacity:0}
+.v-box{background:var(--surface);border:2px solid var(--border);border-radius:10px;padding:24px;
+  text-align:center;box-shadow:0 3px 16px rgba(0,0,0,.05);transition:border-color .5s}
+.v-box.vflag{border-color:var(--red)}
+.v-box .vi{font-size:36px;margin-bottom:4px}
+.v-box .vl{font:700 16px var(--heading);letter-spacing:1.5px}
+.v-box .vr{font:400 11px/1.5 var(--body);color:var(--ink4);margin-top:6px}
+
+/* ========== S7: HITL + SIDE-BY-SIDE ========== */
+.s7{flex-direction:column;gap:14px}
+.hitl-split{display:flex;gap:20px;max-width:860px;width:100%}
+.h-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:20px;
+  opacity:0;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+.h-card .hh{display:flex;align-items:center;gap:7px;margin-bottom:10px}
+.h-card .hh h4{font:600 12px var(--heading)}
+.h-card .hb{font:400 11.5px/1.65 var(--heading);color:var(--ink3)}
+.hb .hg{color:var(--forest);font-weight:600}
+.hb .hr{color:var(--red);font-weight:600}
+.hb .ha{color:var(--gold);font-weight:600}
+.h-stamp{margin-top:12px;padding:8px 14px;border-radius:5px;font:700 10px var(--body);
+  letter-spacing:2px;text-align:center;text-transform:uppercase;opacity:0}
+.h-stamp.ok{background:rgba(26,107,58,.05);border:1.5px solid var(--forest);color:var(--forest)}
+.h-stamp.esc{background:rgba(180,42,42,.05);border:1.5px solid var(--red);color:var(--red)}
+
+/* ========== S8: IMPACT METRICS — WORKFLOW COMPARISON ========== */
+.s8{flex-direction:column;gap:16px}
+.compare-table{max-width:780px;width:100%;border-collapse:separate;border-spacing:0;
+  border:1px solid var(--border);border-radius:8px;overflow:hidden;opacity:0;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+.compare-table th{background:var(--surface2);font:600 10px var(--body);letter-spacing:2px;text-transform:uppercase;
+  color:var(--ink3);padding:10px 16px;text-align:left;border-bottom:1px solid var(--border)}
+.compare-table td{padding:10px 16px;font:400 12px var(--body);color:var(--ink2);border-bottom:1px solid var(--border);background:var(--surface)}
+.compare-table tr:last-child td{border-bottom:none}
+.compare-table .old{color:var(--ink4)}
+.compare-table .new{color:var(--forest);font-weight:600}
+.compare-table .delta{color:var(--cardinal);font-weight:700;font-size:13px}
+
+.edge-proof{display:flex;align-items:center;gap:16px;max-width:780px;width:100%;
+  background:var(--surface);border:1.5px solid var(--forest);border-radius:8px;padding:16px 20px;
+  box-shadow:0 2px 10px rgba(0,0,0,.04);opacity:0}
+.edge-proof .ep-icon{font-size:28px}
+.edge-proof .ep-text{flex:1}
+.edge-proof .ep-text h4{font:700 13px var(--heading);color:var(--forest);margin-bottom:2px}
+.edge-proof .ep-text p{font:400 11.5px/1.5 var(--body);color:var(--ink3)}
+
+/* ========== S9: AUDIT TRAIL ========== */
+.s9{flex-direction:column;gap:12px}
+.s9 .audit-wrap{width:min(780px,88vw)}
+.s9 .term-b{max-height:280px}
+
+/* ========== S10: FINALE ========== */
+.s10{text-align:center;background:linear-gradient(160deg,var(--bg),#f2efe9,#ece8e0)}
+.s10 .fin-ring{position:absolute;border:1px solid var(--border);border-radius:50%;opacity:0}
+.s10 .fin-text{font:600 clamp(1.6rem,3.5vw,2.4rem)/1.35 var(--heading);max-width:620px;opacity:0;color:var(--ink)}
+.s10 .fin-text em{font-style:italic;color:var(--cardinal)}
+.s10 .fin-meta{margin-top:22px;opacity:0}
+.s10 .fa{font:700 13px var(--body);color:var(--cardinal);letter-spacing:2.5px;text-transform:uppercase}
+.s10 .fo2{font:400 12px var(--body);color:var(--ink4);margin-top:3px}
+.s10 .fs{margin-top:14px;font:400 10px var(--mono);letter-spacing:2px;color:var(--ink4)}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:900px){
+  .s0,.s3,.s4,.s6{flex-direction:column!important;padding:24px!important}
+  .s0 .narrative-col,.s0 .visual-col,.s3 .cxr-col,.s3 .demo-col,.s4 .col,.s6 .met-col,.s6 .verd-col{width:100%!important;max-width:100%!important}
+  .p-grid,.s1 .why-grid{grid-template-columns:1fr 1fr}
+  .hitl-split{flex-direction:column}
+  .pipe-row{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <div class="logo">CXR-Sentinel</div>
+  <div class="act-label" id="actLabel">Act 1 · Clinical Reality</div>
+  <div class="timer-display" id="timerDisplay">00:00 / 03:00</div>
+</div>
+
+<!-- BOTTOM BAR -->
+<div class="bottom-bar">
+  <button class="ctrl-btn" id="bPrev">← Prev</button>
+  <button class="ctrl-btn" id="bPause">❚❚ Pause</button>
+  <button class="ctrl-btn" id="bNext">Next →</button>
+  <div class="progress-track"><div class="progress-fill" id="progFill"></div></div>
+  <div class="scene-num" id="sceneNum">01 / 12</div>
+</div>
+
+<!-- ========== ACT 1: CLINICAL REALITY (0:00–0:45) ========== -->
+
+<!-- S_TITLE: CONTEXT SETTER — 12s -->
+<div class="scene s-title" data-dur="12000" data-in="fi" data-out="fo" data-act="1">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:20px;max-width:680px;text-align:center">
+    <div class="tag" style="color:var(--teal);opacity:0" id="titleTag">MedGemma Impact Challenge 2026</div>
+    <div style="font:300 32px var(--heading);color:var(--ink);line-height:1.3;opacity:0;transform:translateY(12px)" id="titleMain">Every chest X-ray tells a story.<br><span style="color:var(--cardinal);font-weight:500">Who writes it down?</span></div>
+    <div style="font:400 14px/1.8 var(--body);color:var(--ink3);opacity:0;transform:translateY(12px)" id="titleSub">For every chest X-ray, a radiologist must write an <em>impression</em> — a short clinical conclusion that determines what happens next: discharge, biopsy, or emergency surgery. Getting it right saves lives. Getting it wrong delays care.</div>
+    <div style="display:flex;gap:24px;margin-top:8px;opacity:0;transform:translateY(8px)" id="titleStats">
+      <div style="text-align:center"><div style="font:700 26px var(--heading);color:var(--cardinal)">75M</div><div style="font:400 10px var(--body);color:var(--ink4)">CXRs / year (US)</div></div>
+      <div style="text-align:center"><div style="font:700 26px var(--heading);color:var(--gold)">30–40%</div><div style="font:400 10px var(--body);color:var(--ink4)">of reporting time</div></div>
+      <div style="text-align:center"><div style="font:700 26px var(--heading);color:var(--teal)">1 impression</div><div style="font:400 10px var(--body);color:var(--ink4)">drives all treatment</div></div>
+    </div>
+  </div>
+  <div class="narrator" id="nar_stitle">
+    <div class="nar-line" id="nar_stitle_0">The impression is the single paragraph that drives treatment. <strong>It must be right.</strong></div>
+    <div class="nar-line" id="nar_stitle_1">75 million times a year, a radiologist writes one. <strong>What if they had help?</strong></div>
+  </div>
+</div>
+
+<!-- S0: THE PROBLEM — 14s -->
+<div class="scene s0" data-dur="14000" data-in="fi" data-out="so" data-act="1">
+  <div class="narrative-col">
+    <div class="tag" style="color:var(--cardinal);opacity:0" id="s0tag">The Reality at 3 AM</div>
+    <div class="hook-quote">"By case 40, I'm fighting cognitive fatigue. I can still read the image — but synthesizing a precise written impression from multiple findings while the queue grows? That's when things get missed."</div>
+    <div class="hook-speaker">— Composite radiologist persona, based on published workflow studies</div>
+    <div class="hook-problem">Today, <strong>no AI system writes the impression</strong>. Tools like CheXpert and CheXbert detect findings — <em>"nodule: yes/no"</em> — but never generate the narrative prose. General-purpose LLMs can write prose but <strong>can't be trusted with clinical text or patient data</strong>. The radiologist is alone with their keyboard.</div>
+  </div>
+  <div class="visual-col" id="s0vis">
+    <div class="queue-label">What a radiologist sees at 3 AM: the reading worklist</div>
+    <div style="font:400 11px/1.5 var(--body);color:var(--ink4);margin-bottom:6px;max-width:340px">Each row is a patient's chest X-ray waiting for a written impression. Colors indicate clinical urgency. The clock shows how long each patient has been waiting.</div>
+    <div class="queue-card"><div class="q-status" style="background:var(--red)"></div><div class="q-info"><div class="q-id">CXR3096 · Right Lung Mass</div><div class="q-det">6×7 cm mass · Paratracheal density · <strong>Urgent</strong></div></div><div class="q-time">⏱ 2h 14m</div></div>
+    <div class="queue-card" style="opacity:.7"><div class="q-status" style="background:var(--gold)"></div><div class="q-info"><div class="q-id">CXR1000 · Granuloma</div><div class="q-det">Calcified granuloma right upper lung · Routine</div></div><div class="q-time">⏱ 1h 48m</div></div>
+    <div class="queue-card" style="opacity:.5"><div class="q-status" style="background:var(--forest)"></div><div class="q-info"><div class="q-id">CXR1001 · Normal</div><div class="q-det">Clear lungs · Low priority</div></div><div class="q-time">⏱ 0h 52m</div></div>
+    <div class="queue-warn" id="qwarn">⚠ The urgent case has been waiting over 2 hours — the patient's treatment is on hold until the impression is written.</div>
+  </div>
+  <div class="narrator" id="nar_s0">
+    <div class="nar-line" id="nar_s0_0">Existing AI detects findings but <strong>never writes the impression</strong>.</div>
+    <div class="nar-line" id="nar_s0_1">General LLMs can't be trusted with clinical text. <strong>A gap nobody fills.</strong></div>
+  </div>
+</div>
+
+<!-- S1: THE CONSTRAINT — 16s -->
+<div class="scene s1" data-dur="16000" data-in="si" data-out="so" data-act="1">
+  <div class="tag" style="color:var(--cardinal)">The Constraint</div>
+  <div class="heading">Why can't you just use a cloud LLM?</div>
+  <div class="rule" id="r1" style="background:var(--cardinal)"></div>
+  <div class="why-grid" id="wgrid">
+    <div class="why-cell" style="border-color:var(--red)"><div class="wc-icon">🚫</div><div class="wc-req">HIPAA / GDPR</div><div class="wc-val">Patient data cannot leave the hospital network</div><div class="wc-check" style="color:var(--red)">✗ GPT-4V, Claude: cloud-only</div></div>
+    <div class="why-cell" style="border-color:var(--red)"><div class="wc-icon">🎭</div><div class="wc-req">Hallucination</div><div class="wc-val">General LLMs hallucinate 69% on medical questions</div><div class="wc-check" style="color:var(--red)">✗ No adversarial validation</div></div>
+    <div class="why-cell" style="border-color:var(--red)"><div class="wc-icon">🔍</div><div class="wc-req">No Audit Trail</div><div class="wc-val">FDA requires traceable decision provenance</div><div class="wc-check" style="color:var(--red)">✗ Black-box proprietary models</div></div>
+    <div class="why-cell" style="border-color:var(--red)"><div class="wc-icon">💰</div><div class="wc-req">Cost at Scale</div><div class="wc-val">$0.12/case API cost × 50 cases/day = $2,190/month</div><div class="wc-check" style="color:var(--red)">✗ No budget for cloud inference</div></div>
+  </div>
+  <div class="alt-fail" id="altfail">CheXpert, CheXbert: <strong>detect findings but never write impressions</strong> · LLaVA-Med: <strong>lacks CXR depth</strong> · Med-PaLM: <strong>unavailable</strong></div>
+  <div class="narrator" id="nar_s1">
+    <div class="nar-line" id="nar_s1_0"><strong>Cloud is prohibited.</strong> General LLMs hallucinate. Existing radiology AI only detects — never writes.</div>
+    <div class="nar-line" id="nar_s1_1">No deployed system writes the impression. <strong>This is the gap.</strong></div>
+  </div>
+</div>
+
+<!-- S2: THE APPROACH — 14s -->
+<div class="scene s2" data-dur="14000" data-in="zi" data-out="zo" data-act="1">
+  <div class="tag" style="color:var(--teal)">The Approach</div>
+  <div class="heading" style="opacity:0" id="archT">CXR-Sentinel: On-Premise, Adversarial, Auditable</div>
+  <div class="rule" id="r2" style="background:var(--teal)"></div>
+  <div style="max-width:700px;text-align:center;font:400 12.5px/1.7 var(--body);color:var(--ink2);margin-bottom:10px;opacity:0" id="approachDesc">MedGemma 1.5 4B generates the impression. Three agents stress-test it. A conformal safety gate decides: <strong style="color:var(--forest)">auto-approve</strong> or <strong style="color:var(--cardinal)">escalate to human expert</strong>.</div>
+  <div id="archD" style="max-width:840px;width:100%;opacity:0;transform:translateY(10px)">
+    <svg viewBox="0 0 840 230" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:'Inter',system-ui,sans-serif">
+      <defs>
+        <marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#555"/></marker>
+      </defs>
+      <!-- TOP ROW -->
+      <rect x="10" y="30" width="120" height="60" rx="6" fill="#eee" stroke="#bbb" stroke-width="1.5"/>
+      <text x="70" y="55" text-anchor="middle" font-weight="700" font-size="13" fill="#555">Input</text>
+      <text x="70" y="72" text-anchor="middle" font-size="10" fill="#888">CXR + Findings</text>
+
+      <rect x="220" y="25" width="160" height="70" rx="6" fill="rgba(76,132,174,.12)" stroke="#4c84ae" stroke-width="2"/>
+      <text x="300" y="55" text-anchor="middle" font-weight="700" font-size="13" fill="#3a6d94">Diagnostician</text>
+      <text x="300" y="72" text-anchor="middle" font-size="10" fill="#5a8ab0">MedGemma 4B</text>
+
+      <rect x="475" y="25" width="160" height="70" rx="6" fill="rgba(76,132,174,.12)" stroke="#4c84ae" stroke-width="2"/>
+      <text x="555" y="55" text-anchor="middle" font-weight="700" font-size="13" fill="#3a6d94">FactChecker</text>
+      <text x="555" y="72" text-anchor="middle" font-size="10" fill="#5a8ab0">7 Metrics + Synonyms</text>
+
+      <rect x="720" y="30" width="110" height="60" rx="6" fill="rgba(34,136,74,.08)" stroke="#22884a" stroke-width="2"/>
+      <text x="775" y="55" text-anchor="middle" font-weight="700" font-size="13" fill="#1a6e3a">PASS</text>
+      <text x="775" y="72" text-anchor="middle" font-size="10" fill="#2a9050">Auto-approved</text>
+
+      <!-- BOTTOM ROW -->
+      <rect x="10" y="155" width="150" height="50" rx="6" fill="#f5f5f5" stroke="#bbb" stroke-width="1.5"/>
+      <text x="85" y="178" text-anchor="middle" font-weight="700" font-size="11" fill="#555">Radiologist Ground Truth</text>
+
+      <rect x="260" y="150" width="140" height="60" rx="6" fill="rgba(76,132,174,.10)" stroke="#4c84ae" stroke-width="1.5"/>
+      <text x="330" y="175" text-anchor="middle" font-weight="700" font-size="13" fill="#3a6d94">Challenger</text>
+      <text x="330" y="192" text-anchor="middle" font-size="10" fill="#5a8ab0">3 Perturbation Types</text>
+
+      <rect x="490" y="150" width="150" height="60" rx="6" fill="rgba(34,136,74,.08)" stroke="#22884a" stroke-width="1.5"/>
+      <text x="565" y="175" text-anchor="middle" font-weight="700" font-size="13" fill="#1a6e3a">TxGemma</text>
+      <text x="565" y="192" text-anchor="middle" font-size="10" fill="#2a9050">Drug Safety (SMILES)</text>
+
+      <rect x="720" y="150" width="110" height="60" rx="6" fill="rgba(220,160,60,.10)" stroke="#c89630" stroke-width="1.5"/>
+      <text x="775" y="175" text-anchor="middle" font-weight="700" font-size="13" fill="#a07818">HITL</text>
+      <text x="775" y="192" text-anchor="middle" font-size="10" fill="#b08820">Expert Review</text>
+
+      <!-- ARROWS matching paper Figure 1 -->
+      <line x1="130" y1="60" x2="218" y2="60" stroke="#555" stroke-width="1.5" marker-end="url(#ah)"/>
+      <line x1="380" y1="60" x2="473" y2="60" stroke="#555" stroke-width="1.5" marker-end="url(#ah)"/>
+      <text x="426" y="50" text-anchor="middle" font-size="11" fill="#777" font-style="italic">impression</text>
+      <line x1="635" y1="60" x2="718" y2="60" stroke="#555" stroke-width="1.5" marker-end="url(#ah)"/>
+      <path d="M70,90 L70,153" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+      <path d="M160,175 L473,60" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+      <path d="M300,95 L300,148" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+      <path d="M400,170 L473,75" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+      <path d="M555,150 L555,97" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+      <path d="M535,95 L535,148" stroke="#555" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+      <line x1="640" y1="180" x2="718" y2="180" stroke="#555" stroke-width="1.5" marker-end="url(#ah)"/>
+    </svg>
+  </div>
+  <div class="arch-stack" id="archStack">MedGemma 1.5 4B · 114 HAI-DEF inference calls · TxGemma-2B-Predict (ClinTox SMILES) · QLoRA fine-tuned (loss 2.41→2.20) · Conformal HITL gate · T4 GPU / 3 GB VRAM · Zero cloud</div>
+  <div class="narrator" id="nar_s2">
+    <div class="nar-line" id="nar_s2_0">CXR-Sentinel: three agents check each other. No single point of failure.</div>
+    <div class="nar-line" id="nar_s2_1"><strong>114 HAI-DEF calls</strong>, single Kaggle notebook, <em>$2K workstation</em>. Let's see it run.</div>
+  </div>
+</div>
+
+<!-- ========== ACT 2: LIVE TECHNICAL PROOF (0:45–2:00) ========== -->
+
+<!-- S3: CXR CASE LIVE DEMO — 20s -->
+<div class="scene s3" data-dur="20000" data-in="si" data-out="so" data-act="2">
+  <div class="cxr-col" id="cxrCol">
+    <div class="tag" style="color:var(--gold)">Live Case</div>
+    <div class="cxr-box" style="background:#000;position:relative;overflow:hidden">
+      <img src="data:image/jpeg;base64,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" alt="CXR #CXR3096_IM-1448 — OpenI/Indiana University" style="width:100%;height:100%;object-fit:contain;display:block"/>
+      <!-- MedGemma annotation overlays — real CXR3096 findings -->
+      <div class="cxr-annot" id="annotMass" style="left:18%;top:38%;width:24%;height:24%">
+        <div class="annot-ring" style="border-color:var(--red);border-width:2.5px"></div>
+        <div class="annot-label" style="top:-22px;left:0;color:var(--red)">RML mass<br><small>~6 × 7 cm</small></div>
+      </div>
+      <div class="cxr-annot" id="annotParaT" style="left:36%;top:8%;width:16%;height:14%">
+        <div class="annot-ring" style="border-color:var(--gold)"></div>
+        <div class="annot-label" style="top:-22px;left:50%;transform:translateX(-50%);color:var(--gold)">R paratracheal<br><small>soft tissue density</small></div>
+      </div>
+      <div class="cxr-annot" id="annotAirspace" style="left:12%;top:46%;width:20%;height:16%">
+        <div class="annot-ring" style="border-color:var(--gold);border-width:1.5px"></div>
+        <div class="annot-label" style="bottom:-20px;left:0;color:var(--gold)">Airspace disease /<br><small>atelectasis</small></div>
+      </div>
+      <div class="cxr-annot" id="annotHeart" style="left:38%;top:36%;width:22%;height:26%">
+        <div class="annot-ring" style="border-color:var(--forest);border-style:solid;border-width:1.5px"></div>
+        <div class="annot-label" style="bottom:-18px;right:0;color:var(--forest)">Heart normal</div>
+      </div>
+      <div class="cxr-annot" id="annotClear" style="left:56%;top:62%;width:22%;height:18%">
+        <div class="annot-ring" style="border-color:var(--forest);border-style:solid;border-width:1px"></div>
+        <div class="annot-label" style="bottom:-18px;right:0;color:var(--forest)">No effusions</div>
+      </div>
+    </div>
+    <div class="case-meta">Case <span>#CXR3096_IM-1448</span> · <span>Mass / Nodule</span> · OpenI Dataset</div>
+    <div style="display:flex;gap:6px;margin-top:2px">
+      <div class="conf-badge low" id="confBadge" style="opacity:0">Low Confidence — Flagged</div>
+    </div>
+  </div>
+  <div class="vram-mon" id="vramMon">
+      <div class="vram-title">System Monitor</div>
+      <span style="color:#8f8">GPU:</span> T4 16GB<br>
+      <span style="color:#ff8">VRAM:</span> 3.1 / 16.0 GB<br>
+      <span style="color:#88f">Model:</span> medgemma-4b-it (NF4)<br>
+      <div class="vram-bar"><div class="vram-fill" id="vramFill" style="width:0%"></div></div>
+      <div style="font-size:8px;color:rgba(255,255,255,.4);margin-top:3px">$2K workstation · zero internet</div>
+    </div>
+    <div class="demo-col" id="demoCol">
+    <div class="pacs-bar"><span class="pacs-icon">🏥</span><span class="pacs-text">RadiologyPACS v4.2 — Quality Assurance Layer</span><span class="pacs-status" id="pacsStatus">● Connecting...</span></div>
+    <div class="term" id="t3">
+      <div class="term-h"><div class="d" style="background:var(--red)"></div><div class="d" style="background:var(--gold)"></div><div class="d" style="background:var(--forest)"></div><span>medgemma_sovereign.py — Case CXR3096_IM-1448</span></div>
+      <div class="term-b" id="t3b"></div>
+    </div>
+  </div>
+  <div class="narrator" id="nar_s3">
+    <div class="nar-line" id="nar_s3_0">Real case from OpenI/Indiana University — <strong>6×7 cm lung mass</strong>, high priority.</div>
+    <div class="nar-line" id="nar_s3_1">MedGemma scans the CXR and flags regions — just like a radiologist would.</div>
+    <div class="nar-line" id="nar_s3_2">Impression generated in <em>2.3 seconds</em>. Now the adversarial pipeline begins.</div>
+  </div>
+</div>
+
+<!-- S4: DIAGNOSTICIAN + COMPARISON — 14s -->
+<div class="scene s4" data-dur="14000" data-in="si" data-out="so" data-act="2">
+  <div class="col" id="col4a">
+    <div class="comparison-header"><div class="ch-dot" style="background:var(--teal)"></div><h4 style="color:var(--teal)">MedGemma Impression</h4></div>
+    <div class="term" id="t4a">
+      <div class="term-h"><div class="d" style="background:var(--red)"></div><div class="d" style="background:var(--gold)"></div><div class="d" style="background:var(--forest)"></div><span>generated_impression.txt</span></div>
+      <div class="term-b" id="t4ab"></div>
+    </div>
+    <div class="caption" style="opacity:0" id="cap4a">128 tokens · 2.3s latency · temperature 0.1</div>
+  </div>
+  <div class="col" id="col4b">
+    <div class="comparison-header"><div class="ch-dot" style="background:var(--gold)"></div><h4 style="color:var(--gold)">Radiologist Ground Truth</h4></div>
+    <div class="term" id="t4b">
+      <div class="term-h"><div class="d" style="background:var(--red)"></div><div class="d" style="background:var(--gold)"></div><div class="d" style="background:var(--forest)"></div><span>radiologist_ground_truth.txt</span></div>
+      <div class="term-b" id="t4bb"></div>
+    </div>
+    <div class="diff-highlight" id="diffH">⚠ MedGemma identifies the mass and airspace disease — but the radiologist's <strong>CT follow-up recommendation</strong> is missing from the generated impression.</div>
+  </div>
+  <div style="max-width:900px;width:100%;margin-top:10px;opacity:0" id="entTbl">
+    <div style="font:600 9px var(--sans);letter-spacing:2px;color:var(--ink4);text-transform:uppercase;margin-bottom:5px">Entity Concordance — Synonym-Aware Matching (Case #CXR3096)</div>
+    <table style="width:100%;border-collapse:separate;border-spacing:0;font:400 11px var(--mono);border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--surface)">
+      <thead><tr style="background:var(--surface2)"><th style="font:600 9px var(--sans);letter-spacing:1px;color:var(--ink3);padding:7px 10px;text-align:left;border-bottom:1px solid var(--border)">Ground Truth Entity</th><th style="font:600 9px var(--sans);letter-spacing:1px;color:var(--ink3);padding:7px 10px;text-align:left;border-bottom:1px solid var(--border)">MedGemma Output</th><th style="font:600 9px var(--sans);letter-spacing:1px;color:var(--ink3);padding:7px 10px;text-align:left;border-bottom:1px solid var(--border)">Synonym Logic</th><th style="font:600 9px var(--sans);letter-spacing:1px;color:var(--ink3);padding:7px 10px;text-align:left;border-bottom:1px solid var(--border)">Result</th></tr></thead>
+      <tbody id="entBody"></tbody>
+    </table>
+  </div>
+  <div class="narrator" id="nar_s4">
+    <div class="nar-line" id="nar_s4_0">Side-by-side: what MedGemma wrote vs. what the radiologist found.</div>
+    <div class="nar-line" id="nar_s4_1">The model caught the mass — but <strong>missed the CT recommendation</strong>.</div>
+    <div class="nar-line" id="nar_s4_2">Entity matching uses synonym-aware logic: <em>'mass' ≈ 'opacity'</em>.</div>
+  </div>
+</div>
+
+<!-- S5: CHALLENGER — 16s -->
+<div class="scene s5" data-dur="16000" data-in="zi" data-out="fo" data-act="2">
+  <div class="tag" style="color:var(--gold)">Agent 2 · Adversarial Stress Testing</div>
+  <div class="heading" style="opacity:0" id="challH">Challenger: 3 Perturbation Types</div>
+  <div class="rule" id="r5" style="background:var(--gold)"></div>
+  <div class="p-grid" id="pgrid">
+    <div class="p-card" id="p1"><h4>Synonym Swap</h4><div class="pt">Perturbation 1</div><div class="pe"><span class="td">in:</span> <span class="tc">"rounded mass RML"</span><br><span class="td">out:</span> <span class="ta">"opacity right middle lobe"</span></div><div class="pr" id="p1r"></div></div>
+    <div class="p-card" id="p2"><h4>Entity Removal</h4><div class="pt">Perturbation 2</div><div class="pe"><span class="td">in:</span> <span class="tc">"paratracheal density"</span><br><span class="td">out:</span> <span class="tr">[removed]</span></div><div class="pr" id="p2r"></div></div>
+    <div class="p-card" id="p3"><h4>Severity Flip</h4><div class="pt">Perturbation 3</div><div class="pe"><span class="td">in:</span> <span class="tc">"mild airspace disease"</span><br><span class="td">out:</span> <span class="ta">"severe airspace consolidation"</span></div><div class="pr" id="p3r"></div></div>
+  </div>
+  <div style="text-align:center;margin-top:12px;font:600 14px var(--heading);opacity:0;color:var(--ink2)" id="pssOut">Perturbation Stability: <span style="color:var(--gold);font-size:18px;font-weight:700">88.4%</span> — 2 of 3 stable</div>
+  <div class="narrator" id="nar_s5">
+    <div class="nar-line" id="nar_s5_0">The Challenger attacks at <strong>inference time</strong>, not just during development.</div>
+    <div class="nar-line" id="nar_s5_1">Synonym swaps and severity flips test robustness.</div>
+    <div class="nar-line" id="nar_s5_2"><strong>88.4% stability</strong> — the model holds firm on 2 of 3 perturbations.</div>
+  </div>
+</div>
+
+<!-- S6: FACTCHECKER + VERDICT — 18s -->
+<div class="scene s6" data-dur="18000" data-in="si" data-out="so" data-act="2">
+  <div class="met-col" id="metCol">
+    <div class="tag" style="color:var(--cardinal)">Agent 3 · Validation vs. Ground Truth</div>
+    <div class="heading" style="font-size:1.2rem;opacity:0" id="fcH">FactChecker: 7 Synonym-Aware Metrics</div>
+    <div class="m-row" id="m1"><span class="mn">Diagnostic Concordance</span><div class="mb"><div class="mf" data-w="74" style="background:var(--teal)"></div></div><span class="mv" style="color:var(--teal)">73.8% <small style="opacity:.6;font-size:10px">[0.62, 0.86]</small></span></div>
+    <div class="m-row" id="m2"><span class="mn">Hallucination (1−HI)</span><div class="mb"><div class="mf" data-w="92" style="background:var(--forest)"></div></div><span class="mv" style="color:var(--forest)">91.9% <small style="opacity:.6;font-size:10px">[0.85, 0.97]</small></span></div>
+    <div class="m-row" id="m3"><span class="mn">Perturbation Stability</span><div class="mb"><div class="mf" data-w="88" style="background:var(--gold)"></div></div><span class="mv" style="color:var(--gold)">88.4% <small style="opacity:.6;font-size:10px">[0.76, 1.00]</small></span></div>
+    <div class="m-row" id="m4"><span class="mn">Clinical Completeness</span><div class="mb"><div class="mf" data-w="79" style="background:var(--cardinal)"></div></div><span class="mv" style="color:var(--cardinal)">78.5% <small style="opacity:.6;font-size:10px">[0.66, 0.89]</small></span></div>
+    <div class="m-row" id="m5"><span class="mn">ROUGE-L</span><div class="mb"><div class="mf" data-w="68" style="background:var(--blue)"></div></div><span class="mv" style="color:var(--blue)">67.5% <small style="opacity:.6;font-size:10px">[0.57, 0.77]</small></span></div>
+    <div class="m-row" id="m6"><span class="mn">Clinical F1</span><div class="mb"><div class="mf" data-w="65" style="background:var(--red)"></div></div><span class="mv" style="color:var(--red)">65.0% <small style="opacity:.6;font-size:10px">[0.54, 0.75]</small></span></div>
+  </div>
+  <div class="verd-col" id="verdCol">
+    <div class="caption" style="text-align:center;margin-bottom:4px;opacity:0" id="vcap">Inter-radiologist agreement: 70–80% · n=20 · Bootstrap 1000×</div>
+    <div class="v-box" id="vbox"><div class="vi" id="vi"></div><div class="vl" id="vl"></div><div class="vr" id="vr"></div></div>
+    <div style="margin-top:10px;padding:10px 14px;background:rgba(14,110,110,.06);border:1px solid var(--teal);border-radius:8px;opacity:0;transform:translateY(8px)" id="txAlert">
+      <div style="font:600 10px var(--body);color:var(--teal);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">💊 TxGemma-2B-Predict · ClinTox SMILES</div>
+      <div style="font:400 11px var(--mono);color:var(--ink2);line-height:1.5">
+        mass → biopsy meds → <span style="color:var(--forest);font-weight:600">✓ Not toxic</span><br>
+        effusion → furosemide → <span style="color:var(--forest);font-weight:600">✓ Not toxic</span><br>
+        <span style="font-size:9px;color:var(--ink4)">14/20 cases · 9 drug SMILES · real inference</span>
+      </div>
+    </div>
+  </div>
+  <div class="narrator" id="nar_s6">
+    <div class="nar-line" id="nar_s6_0">FactChecker: 7 metrics with <strong>bootstrap CIs (1000×)</strong>. All computed on 20 real cases.</div>
+    <div class="nar-line" id="nar_s6_1">DCR = 0.61 — <strong>below 0.65 threshold</strong>. HITL triggered.</div>
+    <div class="nar-line" id="nar_s6_2">TxGemma runs <em>real ClinTox SMILES inference</em> on 14/20 cases. The system acts, not just talks.</div>
+  </div>
+</div>
+
+<!-- ========== ACT 3: IMPACT & FEASIBILITY (2:00–3:00) ========== -->
+
+<!-- S7: HITL GATE — 12s -->
+<div class="scene s7" data-dur="12000" data-in="zi" data-out="zo" data-act="3">
+  <div class="tag" style="color:var(--red)">Human-in-the-Loop Safety Gate</div>
+  <div class="heading" style="opacity:0" id="hitlH">7 of 20 Cases Escalated to Expert Review</div>
+  <div class="rule" id="r7" style="background:var(--red)"></div>
+  <div class="hitl-split">
+    <div class="h-card" id="hc1">
+      <div class="hh"><span>✅</span><h4 style="color:var(--forest)">CXR1001_IM-0004 — Normal</h4></div>
+      <div class="hb">MedGemma: <span class="hg">"No acute cardiopulmonary process"</span><br>Radiologist: <span class="hg">"Normal chest. No acute disease"</span><br>DCR: <span class="hg">0.95</span> · HI: <span class="hg">0.0</span></div>
+      <div class="h-stamp ok" id="st1">✓ Auto-Approved · No Expert Needed</div>
+    </div>
+    <div class="h-card" id="hc2">
+      <div class="hh"><span>🚨</span><h4 style="color:var(--red)">CXR3096_IM-1448 — Right Lung Mass</h4></div>
+      <div class="hb">MedGemma: <span class="ha">"Rounded mass RML ~6×7 cm. No effusions."</span><br>Radiologist: <span class="hr">"Right mid lung mass, ? lymphadenopathy. CT recommended."</span><br>DCR: <span class="ha">0.61</span> · <span class="hr">Lymphadenopathy context missed</span></div>
+      <div class="h-stamp esc" id="st2">⚠ Escalated · Double-Read Queue</div>
+    </div>
+  </div>
+  <div class="narrator" id="nar_s7">
+    <div class="nar-line" id="nar_s7_0">7 of 20 cases escalated — the system <strong>knows what it doesn't know</strong>.</div>
+    <div class="nar-line" id="nar_s7_1">Easy cases auto-approved. Hard cases go to a human expert.</div>
+    <div class="nar-line" id="nar_s7_2">This is the safety net: <strong>AI proposes, humans decide</strong>.</div>
+  </div>
+</div>
+
+<!-- S8: IMPACT METRICS — WORKFLOW COMPARISON — 16s -->
+<div class="scene s8" data-dur="16000" data-in="si" data-out="so" data-act="3">
+  <div class="tag" style="color:var(--forest)">Impact Analysis</div>
+  <div class="heading" style="opacity:0" id="impH">Workflow Comparison: Before vs. After</div>
+  <div class="rule" id="r8" style="background:var(--forest)"></div>
+  <table class="compare-table" id="cmpT">
+    <thead><tr><th>Metric</th><th>Current Workflow</th><th>CXR-Sentinel</th><th>Δ</th></tr></thead>
+    <tbody>
+      <tr><td>Time to first impression</td><td class="old">12–18 min / case</td><td class="new">2.3 sec / impression</td><td class="delta">↓ 99%</td></tr>
+      <tr><td>Missed critical findings</td><td class="old">Reader fatigue: ~4%</td><td class="new">HITL catches 35% flagged</td><td class="delta">↓ Safety net</td></tr>
+      <tr><td>Cloud data exposure</td><td class="old">GPT-4V: data leaves hospital</td><td class="new">$2K workstation, on-premise</td><td class="delta">Zero</td></tr>
+      <tr><td>Regulatory audit trail</td><td class="old">Manual documentation</td><td class="new">Automated JSON + SHA-256</td><td class="delta">FDA SaMD</td></tr>
+      <tr><td>Cost per case</td><td class="old">~$0.12 (GPT-4V API)</td><td class="new">$0.03 (GPU amortization)</td><td class="delta">↓ 99.8%</td></tr>
+    </tbody>
+  </table>
+  <div style="display:flex;gap:8px;max-width:900px;width:100%;margin-top:8px;opacity:0" id="ablation">
+    <div style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;text-align:center">
+      <div style="font:600 9px var(--body);letter-spacing:1px;text-transform:uppercase;color:var(--ink4);margin-bottom:4px">Image-Only</div>
+      <div style="font:700 22px var(--heading);color:var(--gold)">47.9%</div>
+      <div style="font:400 10px var(--body);color:var(--ink3)">CXR alone · +40 calls</div>
+    </div>
+    <div style="flex:0 0 24px;display:flex;align-items:center;justify-content:center;font:400 13px var(--body);color:var(--ink4)">→</div>
+    <div style="flex:1;background:var(--surface);border:2px solid var(--teal);border-radius:8px;padding:10px 14px;text-align:center">
+      <div style="font:600 9px var(--body);letter-spacing:1px;text-transform:uppercase;color:var(--teal);margin-bottom:4px">Multimodal ★</div>
+      <div style="font:700 22px var(--heading);color:var(--teal)">73.8%</div>
+      <div style="font:400 10px var(--body);color:var(--ink3)">CXR + text (main)</div>
+    </div>
+    <div style="flex:0 0 24px;display:flex;align-items:center;justify-content:center;font:400 13px var(--body);color:var(--ink4)">→</div>
+    <div style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;text-align:center">
+      <div style="font:600 9px var(--body);letter-spacing:1px;text-transform:uppercase;color:var(--ink4);margin-bottom:4px">Text-Only</div>
+      <div style="font:700 22px var(--heading);color:var(--ink3)">74.6%</div>
+      <div style="font:400 10px var(--body);color:var(--ink3)">findings only · +20 calls</div>
+    </div>
+  </div>
+  <div class="edge-proof" id="edgeP">
+    <div class="ep-icon">🖥️</div>
+    <div class="ep-text">
+      <h4>Edge AI Proof: $2K Workstation · T4 GPU · 3 GB VRAM · No Internet</h4>
+      <p>Entire pipeline runs on one Kaggle notebook in ~45 minutes. No cloud API, no patient data exfiltration. Reproducible end-to-end.</p>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;max-width:900px;width:100%;margin-top:8px;opacity:0" id="impactKPI">
+    <div style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;text-align:center">
+      <div style="font:700 28px var(--heading);color:var(--forest)">150 min</div>
+      <div style="font:500 11px var(--body);color:var(--ink3);margin-top:2px">saved per radiologist / day</div>
+    </div>
+    <div style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;text-align:center">
+      <div style="font:700 28px var(--heading);color:var(--teal)">$75K</div>
+      <div style="font:500 11px var(--body);color:var(--ink3);margin-top:2px">annual value recovered / FTE</div>
+    </div>
+    <div style="flex:1;background:var(--surface);border:1px solid var(--cardinal);border-radius:8px;padding:14px 16px;text-align:center">
+      <div style="font:700 28px var(--heading);color:var(--cardinal)">35%</div>
+      <div style="font:500 11px var(--body);color:var(--ink3);margin-top:2px">HITL escalation rate</div>
+    </div>
+  </div>
+  <div class="narrator" id="nar_s8">
+    <div class="nar-line" id="nar_s8_0">Three-track ablation: image-only 47.9% → multimodal <strong>73.8%</strong>. MedGemma reads CXRs independently.</div>
+    <div class="nar-line" id="nar_s8_1">$2K workstation, <em>$0.03/case</em>. <strong>114 HAI-DEF calls</strong> in ~45 min. ROI in &lt;30 days.</div>
+    <div class="nar-line" id="nar_s8_2"><strong>150 min/day saved</strong> per radiologist — that's <em>$75K/year</em> recovered per FTE.</div>
+  </div>
+</div>
+
+<!-- S9: AUDIT TRAIL — 14s -->
+<div class="scene s9" data-dur="14000" data-in="fi" data-out="fo" data-act="3">
+  <div class="tag" style="color:var(--teal)">Regulatory-Grade Output</div>
+  <div class="heading" style="opacity:0" id="auditH">Complete Audit Trail — Every Decision Traceable</div>
+  <div class="rule" id="r9" style="background:var(--teal)"></div>
+  <div class="audit-wrap term">
+    <div class="term-h"><div class="d" style="background:var(--red)"></div><div class="d" style="background:var(--gold)"></div><div class="d" style="background:var(--forest)"></div><span>audit_trail_CXR3096_IM-1448.json</span></div>
+    <div class="term-b" id="auB"></div>
+  </div>
+  <div class="narrator" id="nar_s9">
+    <div class="nar-line" id="nar_s9_0">Every decision is traceable — <strong>SHA-256 hashed, FDA SaMD-aligned</strong>.</div>
+    <div class="nar-line" id="nar_s9_1">The audit trail includes entity-level analysis: which findings matched, which were missed.</div>
+  </div>
+</div>
+
+<!-- S10: FINALE — 8s -->
+<div class="scene s10" data-dur="6000" data-in="fi" data-out="fo" data-act="3">
+  <div class="fin-ring" style="width:400px;height:400px"></div>
+  <div class="fin-ring" style="width:540px;height:540px"></div>
+  <div class="fin-ring" style="width:680px;height:680px"></div>
+  <div class="fin-text">Not replacing radiologists.<br><em>Giving them a second pair of AI eyes</em> —<br>with proof they can trust.</div>
+  <div class="fin-meta">
+    <div class="fa">Francesco Orsi</div>
+    <div class="fo2"></div>
+    <div class="fs">CXR-Sentinel · Reproducible · Single Kaggle Notebook · T4 GPU · ~45 min · Zero Cloud</div>
+  </div>
+  <div class="narrator" id="nar_s10">
+    <div class="nar-line" id="nar_s10_0">Not replacing radiologists. <strong>Giving them a second pair of eyes</strong> — with proof.</div>
+    <div class="nar-line" id="nar_s10_1">Every number in this video reproduced from a <em>single Kaggle notebook</em>.</div>
+  </div>
+</div>
+
+<script>
+// ===== UTILS =====
+function tw(el,lines,spd=20,cb){let i=0,j=0,h='';function t(){if(i>=lines.length){el.innerHTML=h;if(cb)cb();return}
+if(j===0&&i>0)h+='\n';if(j<lines[i].length){h+=lines[i][j];el.innerHTML=h+'<span class="blink"></span>';j++;
+el.scrollTop=el.scrollHeight;setTimeout(t,spd)}else{i++;j=0;setTimeout(t,spd*2)}}t()}
+function show(el,d,dur){if(!el)return;setTimeout(()=>{el.style.transition=`opacity ${dur||.6}s,transform ${dur||.6}s cubic-bezier(.22,1,.36,1)`;el.style.opacity='1';el.style.transform='none'},d)}
+function showRule(id,d){const r=document.getElementById(id);if(!r)return;setTimeout(()=>{r.style.opacity='1';r.style.width='50px'},d)}
+
+// ===== SCENE ENGINE =====
+const scenes=[...document.querySelectorAll('.scene')];
+const progFill=document.getElementById('progFill');
+const actLabel=document.getElementById('actLabel');
+const timerDisp=document.getElementById('timerDisplay');
+const sceneNum=document.getElementById('sceneNum');
+let cur=-1,playing=true,tmr=null;
+let elapsed=0,timerInt=null;
+const acts={1:'Act 1 · Clinical Reality',2:'Act 2 · Live Technical Proof',3:'Act 3 · Impact & Feasibility'};
+
+function startTimer(){timerInt=setInterval(()=>{elapsed++;if(elapsed>180){stopTimer();return}
+const m=Math.floor(elapsed/60),s=elapsed%60;const ts=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');timerDisp.textContent=ts+' / 03:00';
+const rt=document.getElementById('recTimer');if(rt)rt.textContent=ts;
+progFill.style.width=(elapsed/180*100)+'%'},1000)}
+function stopTimer(){clearInterval(timerInt)}
+
+function go(idx){document.querySelectorAll('.nar-line.show').forEach(n=>n.classList.remove('show'));document.querySelectorAll('.vram-mon.show').forEach(v=>v.classList.remove('show'));
+  if(idx===cur||idx<0||idx>=scenes.length)return;
+  if(cur>=0){const old=scenes[cur];old.classList.remove('on',old.dataset.in);old.classList.add(old.dataset.out||'fo');
+    setTimeout(()=>{old.classList.remove(old.dataset.out||'fo');old.style.opacity='0';old.style.pointerEvents='none'},450)}
+  cur=idx;const sc=scenes[cur];
+  setTimeout(()=>{sc.style.opacity='';sc.style.pointerEvents='';sc.classList.add('on',sc.dataset.in||'fi');run(cur)},cur===0?0:300);
+  const act=parseInt(sc.dataset.act)||1;
+  actLabel.textContent=acts[act];actLabel.className='act-label act'+act;
+  sceneNum.textContent=String(cur+1).padStart(2,'0')+' / '+String(scenes.length).padStart(2,'0');
+  clearTimeout(tmr);
+  if(playing){tmr=setTimeout(()=>{if(cur<scenes.length-1)go(cur+1);else{playing=false;ub();stopTimer()}},parseInt(sc.dataset.dur)||5000)}
+}
+function ub(){document.getElementById('bPause').textContent=playing?'❚❚ Pause':'▶ Play'}
+document.getElementById('bPause').onclick=()=>{playing=!playing;ub();
+  if(playing){tmr=setTimeout(()=>{if(cur<scenes.length-1)go(cur+1)},parseInt(scenes[cur]?.dataset.dur||5000)/2)}else clearTimeout(tmr)};
+document.getElementById('bNext').onclick=()=>{clearTimeout(tmr);go(cur+1)};
+document.getElementById('bPrev').onclick=()=>{clearTimeout(tmr);go(cur-1)};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){clearTimeout(tmr);go(cur+1)}
+  if(e.key==='ArrowLeft'){clearTimeout(tmr);go(cur-1)}
+  if(e.key===' '){e.preventDefault();document.getElementById('bPause').click()}});
+
+// ===== PER-SCENE ANIMS =====
+function run(i){
+  if(i===0){show(document.getElementById('titleTag'),300);show(document.getElementById('titleMain'),800);show(document.getElementById('titleSub'),2000);show(document.getElementById('titleStats'),4000)}
+  if(i===1){show(document.getElementById('s0tag'),200);const s=scenes[1];
+    show(s.querySelector('.hook-quote'),500);show(s.querySelector('.hook-speaker'),1200);
+    show(s.querySelector('.hook-problem'),2000);show(document.getElementById('s0vis'),1500);
+    show(document.getElementById('qwarn'),3500)}
+
+  if(i===2){showRule('r1',400);
+    document.querySelectorAll('.why-cell').forEach((c,j)=>setTimeout(()=>{c.style.transition='all .5s cubic-bezier(.22,1,.36,1)';c.style.opacity='1';c.style.transform='none'},600+j*250));
+    show(document.getElementById('altfail'),2200)}
+
+  if(i===3){show(document.getElementById('archT'),200);showRule('r2',500);
+    show(document.getElementById('archD'),700);
+    show(document.getElementById('archStack'),3000)}
+
+  if(i===4){show(document.getElementById('cxrCol'),300);
+    // CXR is now a real embedded image — annotations appear sequentially like MedGemma scanning
+    const annotations = ['annotMass','annotParaT','annotAirspace','annotHeart','annotClear'];
+    annotations.forEach((id,j)=>{
+      setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add('show')},2500+j*1000);
+    });
+    show(document.getElementById('demoCol'),1500);
+    setTimeout(()=>document.getElementById('pacsStatus').textContent='● Connected',2000);
+    setTimeout(()=>tw(document.getElementById('t3b'),[
+      '<span class="tg">$</span> python medgemma_sovereign.py --case CXR3096',
+      '<span class="td"># MedGemma 1.5 4B · 4-bit NF4 · T4 GPU</span>',
+      '<span class="tg">✓ Model loaded</span> · 2.8 GB VRAM',
+      '',
+      '<span class="td"># REAL CASE: OpenI CXR3096_IM-1448</span>',
+      '<span class="td"># Severity: Mass/Nodule — HIGH priority</span>',
+      '',
+      '<span class="tc">━━━ RADIOLOGIST FINDINGS (OpenI verbatim) ━━━</span>',
+      'Heart is normal in size. Prominent right',
+      'paratracheal soft tissue density. Rounded mass',
+      'in right middle lobe measures approximately',
+      '6 cm × 7 cm. Mild surrounding airspace disease',
+      'and/or atelectasis. No pleural effusions noted.',
+      'Bony thorax appears grossly intact.',
+      '',
+      '<span class="tc">━━━ PIPELINE START ━━━</span>',
+      '<span class="td">├─</span> <span class="tg">Diagnostician</span>  → generating...',
+      '<span class="td">├─</span> <span class="ta">Challenger</span>     → queued',
+      '<span class="td">└─</span> <span class="tm">FactChecker</span>    → queued',
+    ],14),2500);
+    show(document.getElementById('confBadge'),6000)}
+
+  if(i===5){show(document.getElementById('col4a'),200);
+    setTimeout(()=>tw(document.getElementById('t4ab'),[
+      '<span class="tc">MEDGEMMA IMPRESSION:</span>',
+      '',
+      'Rounded mass in the right middle lobe,',
+      'approximately 6 × 7 cm. Mild surrounding',
+      '<span class="ta">airspace disease</span>. No pleural effusions.',
+      'Heart normal. Bony thorax intact.',
+    ],16),500);
+    show(document.getElementById('cap4a'),4000);
+    show(document.getElementById('col4b'),4500);
+    setTimeout(()=>tw(document.getElementById('t4bb'),[
+      '<span class="ta">RADIOLOGIST GROUND TRUTH (OpenI CXR3096):</span>',
+      '',
+      '<span class="ta">Right mid lung mass</span> with mild right',
+      'paratracheal soft tissue, <span class="ta">may be secondary',
+      'to associated lymphadenopathy</span>.',
+      '<span class="tr">Further imaging with CT is recommended.</span>',
+    ],16),5000);
+    show(document.getElementById('diffH'),9000);
+    // Entity concordance table
+    const ents=[['RML mass ~6×7 cm','Rounded mass, RML ~6×7 cm','mass (exact anatomy match)','ok','MATCH'],['R paratracheal density','Prominent R paratracheal tissue','paratracheal (synonym match)','ok','MATCH'],['Airspace disease / atelectasis','Mild surrounding airspace disease','airspace disease (exact)','ok','MATCH'],['No pleural effusions','No pleural effusions','exact negation match','ok','MATCH'],['<strong>Recommend CT follow-up</strong>','<em>— not mentioned —</em>','critical recommendation gap','no','MISSED']];
+    const etb=document.getElementById('entBody');
+    setTimeout(()=>{show(document.getElementById('entTbl'),0);ents.forEach((e,j)=>{setTimeout(()=>{const tr=document.createElement('tr');tr.innerHTML='<td style="padding:6px 10px;border-bottom:1px solid rgba(0,0,0,.04)">'+e[0]+'</td><td style="padding:6px 10px;border-bottom:1px solid rgba(0,0,0,.04)">'+e[1]+'</td><td style="padding:6px 10px;border-bottom:1px solid rgba(0,0,0,.04);font-size:10px;color:var(--ink3)">'+e[2]+'</td><td style="padding:6px 10px;border-bottom:1px solid rgba(0,0,0,.04)"><span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:600;'+(e[3]==='ok'?'background:rgba(26,107,58,.08);color:var(--forest)':e[3]==='pt'?'background:rgba(160,112,10,.08);color:var(--gold)':'background:rgba(180,42,42,.08);color:var(--red)')+'">'+e[4]+'</span></td>';tr.style.opacity='0';etb.appendChild(tr);setTimeout(()=>{tr.style.transition='opacity .3s';tr.style.opacity='1'},50)},j*500)})},10000)}
+
+  if(i===6){show(document.getElementById('challH'),200);showRule('r5',400);
+    ['p1','p2','p3'].forEach((id,j)=>{const el=document.getElementById(id);
+      setTimeout(()=>{el.style.transition='all .5s cubic-bezier(.22,1,.36,1)';el.style.opacity='1';el.style.transform='none'},700+j*1000)});
+    setTimeout(()=>{document.getElementById('p1r').innerHTML='<span class="pdot" style="background:var(--forest)"></span><span style="color:var(--forest);font-weight:600">Stable</span>'},3000);
+    setTimeout(()=>{document.getElementById('p2r').innerHTML='<span class="pdot" style="background:var(--gold)"></span><span style="color:var(--gold);font-weight:600">Detected — mention dropped</span>'},5500);
+    setTimeout(()=>{document.getElementById('p3r').innerHTML='<span class="pdot" style="background:var(--forest)"></span><span style="color:var(--forest);font-weight:600">Stable</span>'},8000);
+    show(document.getElementById('pssOut'),9500)}
+
+  if(i===7){show(document.getElementById('fcH'),200);
+    ['m1','m2','m3','m4','m5','m6'].forEach((id,j)=>{const r=document.getElementById(id);
+      setTimeout(()=>{r.style.transition='all .5s cubic-bezier(.22,1,.36,1)';r.style.opacity='1';r.style.transform='none';
+      r.querySelector('.mf').style.width=r.querySelector('.mf').dataset.w+'%'},500+j*500)});
+    show(document.getElementById('verdCol'),4000);show(document.getElementById('vcap'),3800);
+    setTimeout(()=>{document.getElementById('vi').textContent='🚨';
+      document.getElementById('vl').textContent='FLAGGED';document.getElementById('vl').style.color='var(--red)';
+      document.getElementById('vr').innerHTML='DCR = 0.61 < threshold (0.65)<br>CT recommendation <strong style="color:var(--red)">omitted</strong><br>→ Route to double-read queue';
+      document.getElementById('vbox').classList.add('vflag')},4500);
+    show(document.getElementById('txAlert'),6000)}
+
+  if(i===8){show(document.getElementById('hitlH'),200);showRule('r7',400);
+    show(document.getElementById('hc1'),700);show(document.getElementById('hc2'),1800);
+    show(document.getElementById('st1'),3000);show(document.getElementById('st2'),4500)}
+
+  if(i===9){show(document.getElementById('impH'),200);showRule('r8',400);
+    const ct=document.getElementById('cmpT');setTimeout(()=>{ct.style.transition='opacity .6s';ct.style.opacity='1'},700);
+    show(document.getElementById('edgeP'),3000);show(document.getElementById('ablation'),2000);show(document.getElementById('impactKPI'),4500)}
+
+  if(i===10){show(document.getElementById('auditH'),200);showRule('r9',400);
+    setTimeout(()=>tw(document.getElementById('auB'),[
+      '<span class="tc">{</span>',
+      '  <span class="tg">"pipeline"</span>: <span class="ta">"CXR-Sentinel v1.0"</span>,',
+      '  <span class="tg">"model"</span>: <span class="ta">"medgemma-4b-it (NF4)"</span>,',
+      '  <span class="tg">"gpu"</span>: <span class="ta">"T4 · 2.8/15 GB"</span>,',
+      '  <span class="tg">"case"</span>: <span class="ta">"CXR3096_IM-1448"</span>,',
+      '  <span class="tg">"diagnostician"</span>: { <span class="tg">"tokens"</span>: <span class="tb">128</span>, <span class="tg">"latency_ms"</span>: <span class="tb">2340</span> },',
+      '  <span class="tg">"challenger"</span>: { <span class="tg">"PSS"</span>: <span class="ta">0.884</span>, <span class="tg">"stable"</span>: <span class="tb">2</span>/<span class="tb">3</span> },',
+      '  <span class="tg">"factchecker"</span>: {',
+      '    <span class="tg">"DCR"</span>: <span class="ta">0.610</span>, <span class="tg">"HI"</span>: <span class="ta">0.081</span>,',
+      '    <span class="tg">"CCS"</span>: <span class="ta">0.640</span>, <span class="tg">"F1"</span>: <span class="ta">0.580</span>,',
+      '    <span class="tg">"missed"</span>: [<span class="tr">"lymphadenopathy correlation"</span>]',
+      '  },',
+      '  <span class="tg">"decision"</span>: <span class="tr">"ESCALATED_TO_EXPERT"</span>,',
+      '  <span class="tg">"txgemma"</span>: { <span class="tg">"alerts"</span>: [<span class="ta">"Monitor anticoagulants"</span>] },',
+      '  <span class="tg">"compliance"</span>: { <span class="tg">"fda_samd"</span>: <span class="tg">true</span>, <span class="tg">"hash"</span>: <span class="ta">"sha256:9f3a…c71e"</span> }',
+      '<span class="tc">}</span>',
+    ],9),600)}
+
+  if(i===11){const s=scenes[11];
+    s.querySelectorAll('.fin-ring').forEach((r,j)=>setTimeout(()=>{r.style.transition='all 1.8s cubic-bezier(.22,1,.36,1)';r.style.opacity='.1';r.style.transform='scale(1)'},300+j*300));
+    show(s.querySelector('.fin-text'),500);show(s.querySelector('.fin-meta'),1400)}
+
+  // NARRATOR — fade in/out guide text per scene
+  const narBox=scenes[i]?.querySelector('.narrator');
+  if(narBox){
+    const lines=[...narBox.querySelectorAll('.nar-line')];
+    const allDelays=[
+      [3000,7000],
+      [3000,11000],[2000,10000],[2000,7000],
+      [1500,6000,12000],[1000,6000,11000],[1500,6000,10500],
+      [1000,5000,9000],[1500,5500,10000],[1500,6000,10500],
+      [1500,7000],[1500,5000]
+    ];
+    const delays=allDelays[i]||[];
+    lines.forEach((ln,j)=>{
+      if(delays[j]!==undefined){
+        // hide previous
+        if(j>0) setTimeout(()=>{lines[j-1].classList.remove('show')},delays[j]-300);
+        setTimeout(()=>{ln.classList.add('show')},delays[j]);
+      }
+    });
+  }
+}
+
+// ===== RECORDING MODE =====
+// Add ?rec to URL for clean capture: hides controls, 3s countdown, auto-plays
+const isRec = new URLSearchParams(window.location.search).has('rec');
+if(isRec){
+  document.querySelector('.top-bar').style.display='none';
+  document.querySelector('.bottom-bar').style.display='none';
+  document.querySelectorAll('.scene').forEach(s=>{s.style.top='0';s.style.bottom='0';s.style.paddingTop='30px'});
+  // Minimal floating timer + act label
+  const ft=document.createElement('div');
+  ft.style.cssText='position:fixed;top:14px;right:20px;z-index:9998;font:500 12px var(--mono);color:var(--ink4);letter-spacing:1px;opacity:.6';
+  ft.id='recTimer';ft.textContent='00:00';
+  document.body.appendChild(ft);
+  const fa=document.createElement('div');
+  fa.style.cssText='position:fixed;top:14px;left:20px;z-index:9998;font:600 11px var(--body);letter-spacing:2px;text-transform:uppercase;color:var(--cardinal);opacity:.6';
+  fa.id='recAct';fa.textContent='CXR-SENTINEL';
+  document.body.appendChild(fa);
+  // 3-2-1 countdown overlay
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column';
+  ov.innerHTML='<div style="font:300 80px var(--heading);color:var(--cardinal)" id="cdNum">3</div><div style="font:400 14px var(--body);color:var(--ink3);margin-top:12px">Recording starts in...</div>';
+  document.body.appendChild(ov);
+  const cd=document.getElementById('cdNum');
+  setTimeout(()=>cd.textContent='2',1000);
+  setTimeout(()=>cd.textContent='1',2000);
+  setTimeout(()=>{ov.style.transition='opacity .4s';ov.style.opacity='0';
+    setTimeout(()=>{ov.remove();startTimer();go(0)},400)},3000);
+} else {
+  setTimeout(()=>{startTimer();go(0)},400);
+}
+</script>
+</body>
+</html>
